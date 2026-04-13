@@ -1,0 +1,18 @@
+{
+  "name": "pixdrip — Blog Image Beautifier",
+  "short_name": "pixdrip",
+  "description": "Add borders, shadows, and platform-specific sizing to any image",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "any",
+  "categories": ["graphics", "design", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

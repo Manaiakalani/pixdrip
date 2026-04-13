@@ -1,0 +1,7 @@
+services:
+  pixdrip:
+    build: .
+    container_name: pixdrip
+    ports:
+      - "3010:80"
+    restart: unless-stopped

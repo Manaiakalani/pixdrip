@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pixdrip — Blog Image Beautifier</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#09090b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="pixdrip — A browser-based blog image beautifier. Resize, add borders, shadows, frames, and effects for any platform." />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" /></noscript>
+  <link rel="stylesheet" href="/src/styles/main.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 32 32" width="24" height="24">
+          <defs>
+            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#ff6b4a"/>
+              <stop offset="100%" style="stop-color:#fbbf24"/>
+            </linearGradient>
+          </defs>
+          <path d="M16 2c0 0-6 8-6 14a6 6 0 0 0 12 0c0-6-6-14-6-14z" fill="url(#logo-grad)"/>
+        </svg>
+        <h1 class="logo-text">pixdrip</h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-new" class="btn-ghost" title="New image (Cmd+N)" aria-label="New image">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button id="btn-copy" class="btn-ghost" title="Copy to clipboard (Cmd+C)" aria-label="Copy to clipboard" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 11V3.5A.5.5 0 013.5 3H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button id="btn-export" class="btn-primary" aria-label="Export image" disabled>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 10v3a1 1 0 001 1h10a1 1 0 001-1v-3M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Export</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main layout -->
+    <main class="app-main">
+      <!-- Sidebar Controls -->
+      <aside id="sidebar" class="sidebar">
+        <button class="sidebar-handle" id="sidebar-handle" type="button" aria-label="Toggle sidebar">
+          <div class="sidebar-handle-bar"></div>
+        </button>
+        <div class="sidebar-inner">
+          <!-- Preset Section -->
+          <section class="control-section" id="section-presets">
+            <h3 class="section-title">Platform</h3>
+            <div id="preset-grid" class="preset-grid" role="radiogroup" aria-label="Platform presets"></div>
+          </section>
+
+          <!-- My Presets -->
+          <section class="sidebar-section" id="section-custom-presets">
+            <h3 class="section-title">My Presets</h3>
+            <div id="custom-preset-grid" class="preset-grid" role="group" aria-label="Custom presets"></div>
+            <div class="custom-preset-save-row">
+              <input type="text" id="custom-preset-name" class="input-number" placeholder="Preset name…" aria-label="Custom preset name" style="flex:1; width: auto;" />
+              <button type="button" id="btn-save-preset" class="btn-ghost" aria-label="Save current settings as preset">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Save</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Canvas Size -->
+          <section class="control-section" id="section-size">
+            <h3 class="section-title">Canvas Size</h3>
+            <div class="size-inputs">
+              <div class="input-group">
+                <label class="input-label" for="ctrl-width">W</label>
+                <input type="number" id="ctrl-width" class="input-number" aria-label="Canvas width" min="100" max="4096" />
+              </div>
+              <button id="btn-lock-ratio" class="btn-lock active" title="Lock aspect ratio" aria-label="Lock aspect ratio">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+              <div class="input-group">
+                <label class="input-label" for="ctrl-height">H</label>
+                <input type="number" id="ctrl-height" class="input-number" aria-label="Canvas height" min="100" max="4096" />
+              </div>
+            </div>
+          </section>
+
+          <!-- Background -->
+          <section class="control-section" id="section-background">
+            <h3 class="section-title">Background</h3>
+            <div class="bg-type-toggle">
+              <button class="toggle-btn active" data-bg-type="gradient">Gradient</button>
+              <button class="toggle-btn" data-bg-type="solid">Solid</button>
+              <button class="toggle-btn" data-bg-type="transparent">None</button>
+            </div>
+            <div id="gradient-presets" class="gradient-grid"></div>
+            <div class="custom-gradient-row">
+              <input type="color" id="ctrl-gradient-stop1" class="input-color" value="#ff6b4a" aria-label="Gradient start color" />
+              <span class="gradient-arrow">→</span>
+              <input type="color" id="ctrl-gradient-stop2" class="input-color" value="#fbbf24" aria-label="Gradient end color" />
+            </div>
+            <div id="solid-color-row" class="color-row hidden">
+              <label class="input-label" for="ctrl-bg-color">Color</label>
+              <input type="color" id="ctrl-bg-color" class="input-color" value="#1a1a2e" />
+            </div>
+            <div id="gradient-angle-row" class="slider-row">
+              <label class="input-label" for="ctrl-gradient-angle">Angle</label>
+              <input type="range" id="ctrl-gradient-angle" class="input-range" min="0" max="360" value="135" />
+              <span class="range-value" id="val-gradient-angle">135°</span>
+            </div>
+            <div class="noise-row">
+              <label class="input-label" for="ctrl-noise-toggle">Noise</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="ctrl-noise-toggle" />
+                <span class="toggle-track" aria-label="Toggle noise texture"></span>
+              </label>
+            </div>
+          </section>
+
+          <!-- Padding -->
+          <section class="control-section" id="section-padding">
+            <h3 class="section-title">Padding</h3>
+            <div class="slider-row">
+              <input type="range" id="ctrl-padding" class="input-range" min="0" max="160" value="48" aria-label="Padding" />
+              <span class="range-value" id="val-padding">48px</span>
+            </div>
+          </section>
+
+          <!-- Border Radius -->
+          <section class="control-section" id="section-radius">
+            <h3 class="section-title">Border Radius</h3>
+            <div class="slider-row">
+              <input type="range" id="ctrl-radius" class="input-range" min="0" max="48" value="12" aria-label="Corner radius" />
+              <span class="range-value" id="val-radius">12px</span>
+            </div>
+          </section>
+
+          <!-- Border -->
+          <section class="control-section" id="section-border">
+            <div class="section-header">
+              <h3 class="section-title">Border</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="ctrl-border-toggle" aria-label="Toggle border" />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div id="border-controls" class="sub-controls hidden">
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-border-width">Width</label>
+                <input type="range" id="ctrl-border-width" class="input-range" min="1" max="20" value="2" />
+                <span class="range-value" id="val-border-width">2px</span>
+              </div>
+              <div class="color-row">
+                <label class="input-label" for="ctrl-border-color">Color</label>
+                <input type="color" id="ctrl-border-color" class="input-color" value="#808080" />
+              </div>
+            </div>
+          </section>
+
+          <!-- Shadow -->
+          <section class="control-section" id="section-shadow">
+            <div class="section-header">
+              <h3 class="section-title">Shadow</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="ctrl-shadow-toggle" aria-label="Toggle shadow" checked />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div id="shadow-controls" class="sub-controls">
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-shadow-blur">Blur</label>
+                <input type="range" id="ctrl-shadow-blur" class="input-range" min="0" max="100" value="40" />
+                <span class="range-value" id="val-shadow-blur">40px</span>
+              </div>
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-shadow-x">X</label>
+                <input type="range" id="ctrl-shadow-x" class="input-range" min="-50" max="50" value="0" />
+                <span class="range-value" id="val-shadow-x">0px</span>
+              </div>
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-shadow-y">Y</label>
+                <input type="range" id="ctrl-shadow-y" class="input-range" min="-50" max="50" value="12" />
+                <span class="range-value" id="val-shadow-y">12px</span>
+              </div>
+              <div class="color-row">
+                <label class="input-label" for="ctrl-shadow-color">Color</label>
+                <input type="color" id="ctrl-shadow-color" class="input-color" value="#000000" />
+              </div>
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-shadow-opacity">Opacity</label>
+                <input type="range" id="ctrl-shadow-opacity" class="input-range" min="0" max="100" value="25" />
+                <span class="range-value" id="val-shadow-opacity">25%</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Frame Style -->
+          <section class="control-section" id="section-frame">
+            <h3 class="section-title">Frame</h3>
+            <div class="frame-style-grid" role="radiogroup" aria-label="Frame styles">
+              <button class="frame-btn active" data-frame="none" aria-label="No frame">
+                <span class="frame-btn-icon">⊘</span>
+                <span class="frame-btn-label">None</span>
+              </button>
+              <button class="frame-btn" data-frame="macos" aria-label="macOS browser frame">
+                <span class="frame-btn-icon">🖥</span>
+                <span class="frame-btn-label">macOS</span>
+              </button>
+              <button class="frame-btn" data-frame="minimal" aria-label="Minimal window frame">
+                <span class="frame-btn-icon">▫️</span>
+                <span class="frame-btn-label">Minimal</span>
+              </button>
+              <button class="frame-btn" data-frame="iphone" aria-label="iPhone device frame">
+                <span class="frame-btn-icon">📱</span>
+                <span class="frame-btn-label">iPhone</span>
+              </button>
+              <button class="frame-btn" data-frame="macbook" aria-label="MacBook device frame">
+                <span class="frame-btn-icon">💻</span>
+                <span class="frame-btn-label">MacBook</span>
+              </button>
+              <button class="frame-btn" data-frame="ipad" aria-label="iPad device frame">
+                <span class="frame-btn-icon">⬜</span>
+                <span class="frame-btn-label">iPad</span>
+              </button>
+              <button class="frame-btn" data-frame="safari" aria-label="Safari browser frame">
+                <span class="frame-btn-icon">🧭</span>
+                <span class="frame-btn-label">Safari</span>
+              </button>
+              <button class="frame-btn" data-frame="imac" aria-label="iMac display frame">
+                <span class="frame-btn-icon">🖥</span>
+                <span class="frame-btn-label">iMac</span>
+              </button>
+              <button class="frame-btn" data-frame="appletv" aria-label="Apple TV display frame">
+                <span class="frame-btn-icon">📺</span>
+                <span class="frame-btn-label">TV</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Image Filters -->
+          <section class="control-section" id="section-filters">
+            <h3 class="section-title">Filters</h3>
+            <div class="slider-row">
+              <label class="input-label" for="ctrl-filter-brightness">Bright</label>
+              <input type="range" id="ctrl-filter-brightness" class="input-range" min="0" max="200" value="100" />
+              <span class="range-value" id="val-filter-brightness">100%</span>
+            </div>
+            <div class="slider-row">
+              <label class="input-label" for="ctrl-filter-contrast">Contrast</label>
+              <input type="range" id="ctrl-filter-contrast" class="input-range" min="0" max="200" value="100" />
+              <span class="range-value" id="val-filter-contrast">100%</span>
+            </div>
+            <div class="slider-row">
+              <label class="input-label" for="ctrl-filter-saturation">Saturate</label>
+              <input type="range" id="ctrl-filter-saturation" class="input-range" min="0" max="200" value="100" />
+              <span class="range-value" id="val-filter-saturation">100%</span>
+            </div>
+            <div class="slider-row">
+              <label class="input-label" for="ctrl-filter-blur">Blur</label>
+              <input type="range" id="ctrl-filter-blur" class="input-range" min="0" max="20" value="0" step="0.5" />
+              <span class="range-value" id="val-filter-blur">0px</span>
+            </div>
+          </section>
+
+          <!-- Perspective Tilt -->
+          <section class="control-section" id="section-tilt">
+            <div class="section-header">
+              <h3 class="section-title">Perspective</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="ctrl-tilt-toggle" />
+                <span class="toggle-track" aria-label="Toggle perspective tilt"></span>
+              </label>
+            </div>
+            <div id="tilt-controls" class="sub-controls hidden">
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-tilt-x">Tilt X</label>
+                <input type="range" id="ctrl-tilt-x" class="input-range" min="-20" max="20" value="0" />
+                <span class="range-value" id="val-tilt-x">0°</span>
+              </div>
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-tilt-y">Tilt Y</label>
+                <input type="range" id="ctrl-tilt-y" class="input-range" min="-20" max="20" value="0" />
+                <span class="range-value" id="val-tilt-y">0°</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Text Overlay -->
+          <section class="control-section" id="section-text">
+            <div class="section-header">
+              <h3 class="section-title">Text Overlay</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="ctrl-text-toggle" />
+                <span class="toggle-track" aria-label="Toggle text overlay"></span>
+              </label>
+            </div>
+            <div id="text-controls" class="sub-controls hidden">
+              <div class="text-input-row">
+                <input type="text" id="ctrl-text-content" class="input-text" placeholder="Enter title text…" aria-label="Text overlay content" />
+              </div>
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-text-size">Size</label>
+                <input type="range" id="ctrl-text-size" class="input-range" min="12" max="72" value="32" />
+                <span class="range-value" id="val-text-size">32px</span>
+              </div>
+              <div class="select-row">
+                <label class="input-label" for="ctrl-text-weight">Weight</label>
+                <select id="ctrl-text-weight" class="input-select">
+                  <option value="400">Regular</option>
+                  <option value="500">Medium</option>
+                  <option value="600" selected>Semibold</option>
+                  <option value="700">Bold</option>
+                </select>
+              </div>
+              <div class="select-row">
+                <label class="input-label" for="ctrl-text-position">Position</label>
+                <select id="ctrl-text-position" class="input-select">
+                  <option value="top">Top</option>
+                  <option value="center">Center</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </div>
+              <div class="color-row">
+                <label class="input-label" for="ctrl-text-color">Color</label>
+                <input type="color" id="ctrl-text-color" class="input-color" value="#ffffff" />
+              </div>
+              <div class="slider-row">
+                <label class="input-label" for="ctrl-text-opacity">Opacity</label>
+                <input type="range" id="ctrl-text-opacity" class="input-range" min="0" max="100" value="100" />
+                <span class="range-value" id="val-text-opacity">100%</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Export -->
+          <section class="control-section" id="section-export">
+            <h3 class="section-title">Export</h3>
+            <div class="export-controls">
+              <div class="select-row">
+                <label class="input-label" for="ctrl-format">Format</label>
+                <select id="ctrl-format" class="input-select">
+                  <option value="image/png">PNG</option>
+                  <option value="image/jpeg">JPEG</option>
+                  <option value="image/webp">WebP</option>
+                </select>
+              </div>
+              <div class="slider-row" id="quality-row">
+                <label class="input-label" for="ctrl-quality">Quality</label>
+                <input type="range" id="ctrl-quality" class="input-range" min="10" max="100" value="92" />
+                <span class="range-value" id="val-quality">92%</span>
+              </div>
+              <div class="select-row" id="scale-row">
+                <label class="input-label" for="ctrl-scale">Scale</label>
+                <select id="ctrl-scale" class="input-select">
+                  <option value="1">1×</option>
+                  <option value="2" selected>2×</option>
+                  <option value="3">3×</option>
+                </select>
+              </div>
+              <div class="slider-row" id="file-size-row" style="margin-top: 4px;">
+                <span class="input-label" style="font-size: 10px; opacity: 0.6;">Est. size</span>
+                <span class="range-value" id="file-size-estimate" style="font-size: 10px; opacity: 0.6;">—</span>
+              </div>
+              <button id="btn-batch-export" class="btn-batch" aria-label="Export all platform sizes" disabled>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 10v3a1 1 0 001 1h10a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 5l3 3 3-3M8 2v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 7l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/></svg>
+                <span>Export All Sizes</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </aside>
+
+      <!-- Canvas Area -->
+      <div class="canvas-area">
+        <!-- Dropzone (shown when no image) -->
+        <div id="dropzone" class="dropzone">
+          <div class="dropzone-content">
+            <div class="dropzone-icon">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect x="6" y="6" width="36" height="36" rx="8" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.4"/>
+                <path d="M24 16v16M16 24h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+              </svg>
+            </div>
+            <p class="dropzone-title">Drop an image here</p>
+            <p class="dropzone-subtitle">or paste from clipboard · browse files · enter URL</p>
+            <div class="dropzone-actions">
+              <button id="btn-browse" class="btn-secondary">Browse Files</button>
+              <div class="url-input-wrap">
+                <input type="text" id="input-url" class="input-url" aria-label="Image URL" placeholder="Paste image URL..." />
+                <button id="btn-url" class="btn-url-go" aria-label="Load image from URL" disabled>Go</button>
+              </div>
+            </div>
+            <input type="file" id="file-input" accept="image/*" hidden aria-label="Upload image file" />
+          </div>
+        </div>
+
+        <!-- Preview (shown when image loaded) -->
+        <div id="preview-area" class="preview-area hidden">
+          <canvas id="preview-canvas" role="img" aria-label="Preview of exported image"></canvas>
+          <button id="btn-reset-crop" class="btn-reset-crop hidden" title="Reset crop & zoom" aria-label="Reset crop and zoom">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 0111.32-2.5M14 8a6 6 0 01-11.32 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M14 2v4h-4M2 14v-4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="preview-info">
+            <span id="image-info"></span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="toast-container" aria-live="polite" role="status"></div>
+
+  <script type="module" src="/src/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
