@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pixdrip-v1';
+const CACHE_NAME = 'pixdrip-v2';
 const PRECACHE_URLS = [
   '/',
   '/favicon.svg',

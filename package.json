@@ -3,6 +3,24 @@
   "version": "1.0.0",
   "description": "Blog image beautifier — add borders, shadows, and platform-specific sizing to any image",
   "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/Manaiakalani/pixdrip#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Manaiakalani/pixdrip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Manaiakalani/pixdrip/issues"
+  },
+  "keywords": [
+    "image",
+    "blog",
+    "social",
+    "og-image",
+    "canvas",
+    "vite",
+    "pwa"
+  ],
   "bin": {
     "pixdrip": "./cli/pixdrip-cli.js"
   },
