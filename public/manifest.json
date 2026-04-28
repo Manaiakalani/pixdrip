@@ -4,8 +4,8 @@
   "description": "Add borders, shadows, and platform-specific sizing to any image",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#0b0a0e",
+  "theme_color": "#0b0a0e",
   "orientation": "any",
   "categories": ["graphics", "design", "productivity"],
   "icons": [

@@ -7,17 +7,27 @@
    0. Design Tokens
    ---------------------------------------------------------- */
 :root {
-  /* Base */
-  --bg-app: #09090b;
-  --bg-sidebar: rgba(16, 16, 20, 0.85);
+  /* Base — warm-leaning charcoal that lets the coral→amber accent breathe.
+     Premium dark UIs (Linear, Raycast, Vercel, Arc) all push the base slightly
+     off pure neutral so it has hue character without competing with content. */
+  --bg-app: #0b0a0e;
+  --bg-app-deep: #08070a;
+  --bg-elevated: #14121a;
+  --bg-sidebar: rgba(20, 18, 26, 0.72);
   --bg-surface: rgba(255, 255, 255, 0.04);
   --bg-surface-hover: rgba(255, 255, 255, 0.07);
   --bg-surface-active: rgba(255, 255, 255, 0.1);
 
+  /* Ambient backdrop — three faint radial pools of color anchored to corners,
+     painted on body::before. Tuned subtle: ~3–6% alpha. */
+  --ambient-coral: rgba(255, 107, 74, 0.06);
+  --ambient-amber: rgba(251, 191, 36, 0.045);
+  --ambient-violet: rgba(124, 92, 220, 0.03);
+
   /* Text */
-  --text-primary: #e8e8ed;
-  --text-secondary: rgba(232, 232, 237, 0.55);
-  --text-tertiary: rgba(232, 232, 237, 0.35);
+  --text-primary: #ececf1;
+  --text-secondary: rgba(236, 236, 241, 0.58);
+  --text-tertiary: rgba(236, 236, 241, 0.36);
 
   /* Accent — warm coral → amber */
   --accent-start: #ff6b4a;
@@ -25,13 +35,14 @@
   --accent-gradient: linear-gradient(135deg, var(--accent-start), var(--accent-end));
   --accent-text: #ff8a65;
 
-  /* Borders */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-medium: rgba(255, 255, 255, 0.1);
+  /* Borders — warm-tinted hairlines so they feel native to the warm bg */
+  --border-subtle: rgba(255, 248, 240, 0.06);
+  --border-medium: rgba(255, 248, 240, 0.1);
+  --border-highlight: rgba(255, 255, 255, 0.08);
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
 
   /* Spacing */
   --sidebar-width: 320px;
@@ -80,13 +91,39 @@ body {
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-primary);
-  background: var(--bg-app);
+  background-color: var(--bg-app);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow: hidden;
   height: 100vh;
   height: 100dvh;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Ambient backdrop — sits behind everything, never intercepts pointer events.
+   Three soft accent-tinted radial pools give the UI hue character that bleeds
+   through the glass sidebar and header via backdrop-filter. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 1100px 760px at 0% 0%, var(--ambient-coral), transparent 60%),
+    radial-gradient(ellipse 900px 640px at 100% 100%, var(--ambient-amber), transparent 60%),
+    radial-gradient(ellipse 800px 600px at 100% 0%, var(--ambient-violet), transparent 65%);
+}
+
+/* Honor reduced transparency / forced-colors / contrast — flatten the ambient
+   so the UI stays legible for users who request it. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  body::before { display: none; }
+  :root {
+    --bg-sidebar: rgba(14, 13, 18, 0.96);
+  }
 }
 
 img,
@@ -166,8 +203,8 @@ a:focus-visible,
   justify-content: space-between;
   padding: var(--safe-top) max(16px, var(--safe-right)) 0 max(16px, var(--safe-left));
   background: var(--bg-sidebar);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   border-bottom: 1px solid var(--border-subtle);
   contain: layout paint;
 }
@@ -340,12 +377,28 @@ a:focus-visible,
   bottom: 0;
   width: var(--sidebar-width);
   background: var(--bg-sidebar);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
   border-right: 1px solid var(--border-subtle);
   z-index: 50;
   padding-left: var(--safe-left);
   contain: layout paint;
+}
+
+/* Hairline highlight along the inner top edge — Vercel/Linear style.
+   Adds dimension without darkening the ambient bleed-through. */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    transparent 18%,
+    transparent 100%
+  );
 }
 
 .sidebar-inner {
@@ -882,14 +935,29 @@ a:focus-visible,
   min-height: calc(100dvh - var(--header-height) - var(--safe-top));
   overflow: hidden;
   position: relative;
-  background-color: var(--bg-app);
+  background-color: transparent;
   background-image:
-    linear-gradient(45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(255, 255, 255, 0.02) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.02) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.02) 75%);
+    linear-gradient(45deg, rgba(255, 255, 255, 0.022) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.022) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.022) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.022) 75%);
   background-size: 20px 20px;
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+/* Soft vignette behind the preview — fades the corners gently so the actual
+   image preview sits in a calm, focused pool. Sits below preview content. */
+.canvas-area::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 45%,
+    rgba(0, 0, 0, 0.28) 100%
+  );
 }
 
 /* ----------------------------------------------------------
@@ -1015,6 +1083,7 @@ a:focus-visible,
   width: 100%;
   height: 100%;
   position: relative;
+  z-index: 1;
 }
 
 .preview-area canvas {

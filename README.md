@@ -175,7 +175,7 @@ npm test
 
 ## 🎨 Design
 
-Dark charcoal UI (`#09090b`) with glass-morphism sidebar (`backdrop-blur`). Warm coral→amber accent gradient. Built with [Instrument Sans](https://fonts.google.com/specimen/Instrument+Sans) + [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono).
+Warm-leaning charcoal UI (`#0b0a0e`) with a soft ambient backdrop (coral / amber / violet radial pools), glass-morphism sidebar (`backdrop-blur` + saturate), and a subtle vignette around the preview. Warm coral→amber accent gradient. Built with [Instrument Sans](https://fonts.google.com/specimen/Instrument+Sans) + [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono).
 
 ---
 
