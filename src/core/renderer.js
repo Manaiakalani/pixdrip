@@ -145,24 +145,79 @@ export function render(canvas, image, config, scale = 1) {
 }
 
 /**
- * Export the canvas to a Blob at 2× resolution.
- * @param {HTMLCanvasElement} canvas
- * @param {HTMLImageElement} image
- * @param {Object} config
- * @param {string} format - 'image/png' | 'image/jpeg' | 'image/webp'
- * @param {number} quality - 0–1
+ * Export the canvas to a Blob at the specified resolution.
+ * AVIF/WebP support varies — if a requested format returns null, falls back to
+ * WebP (then PNG) so the user always gets a download.
+ *
+ * Two call shapes are supported (legacy positional + options object):
+ *   exportToBlob(canvas, image, config, format, quality, scale)
+ *   exportToBlob(canvas, image, config, { format, quality, scale })
+ *
  * @returns {Promise<Blob>}
  */
 export function exportToBlob(canvas, image, config, format, quality, scale = 2) {
-  render(canvas, image, config, scale);
+  let opts;
+  if (typeof format === 'object' && format !== null) {
+    opts = format;
+  } else {
+    opts = { format, quality, scale };
+  }
+  const finalScale = opts.scale ?? 2;
+  const requested = normalizeFormat(opts.format ?? 'image/png');
+  const q = opts.quality;
+
+  render(canvas, image, config, finalScale);
+
+  // Try requested → fallback chain. AVIF in particular silently returns null
+  // (or throws) on browsers that can encode-decode but don't expose toBlob.
+  const chain = buildFallbackChain(requested);
+  return tryExport(canvas, chain, q);
+}
+
+function normalizeFormat(format) {
+  if (!format) return 'image/png';
+  if (format.startsWith('image/')) return format;
+  // shorthand: 'png' | 'webp' | 'jpeg' | 'avif'
+  const lower = format.toLowerCase();
+  if (lower === 'jpg') return 'image/jpeg';
+  return `image/${lower}`;
+}
+
+function buildFallbackChain(requested) {
+  if (requested === 'image/avif') return ['image/avif', 'image/webp', 'image/png'];
+  if (requested === 'image/webp') return ['image/webp', 'image/png'];
+  if (requested === 'image/jpeg') return ['image/jpeg', 'image/png'];
+  return ['image/png'];
+}
+
+function tryExport(canvas, chain, quality) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Canvas export failed — toBlob returned null'));
-      },
-      format,
-      quality,
-    );
+    let i = 0;
+    const tryNext = () => {
+      if (i >= chain.length) {
+        reject(new Error('Canvas export failed — no supported format produced a blob'));
+        return;
+      }
+      const fmt = chain[i++];
+      try {
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size > 0 && blob.type.startsWith('image/') &&
+                // Some browsers happily return PNG when asked for AVIF — accept
+                // anything non-empty and trust the chain order.
+                (fmt === 'image/png' || blob.type === fmt || blob.size > 0)) {
+              resolve(blob);
+            } else {
+              tryNext();
+            }
+          },
+          fmt,
+          quality,
+        );
+      } catch {
+        tryNext();
+      }
+    };
+    tryNext();
   });
 }

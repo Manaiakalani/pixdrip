@@ -8,6 +8,7 @@ const UNSUPPORTED_MSG = 'Unsupported file format. Please use PNG, JPG, WebP, GIF
 
 let _onImageLoad;
 let _onError;
+let _onBulkFiles;
 let _dropzone;
 let _previewArea;
 
@@ -16,12 +17,14 @@ let _previewArea;
 /**
  * Initialize the dropzone module.
  * @param {Object}   opts
- * @param {Function} opts.onImageLoad - callback(image: HTMLImageElement, meta)
- * @param {Function} opts.onError     - callback(message: string)
+ * @param {Function} opts.onImageLoad  - callback(image: HTMLImageElement, meta)
+ * @param {Function} opts.onError      - callback(message: string)
+ * @param {Function} [opts.onBulkFiles] - callback(File[]) when multiple files dropped/picked
  */
-export function initDropzone({ onImageLoad, onError }) {
+export function initDropzone({ onImageLoad, onError, onBulkFiles }) {
   _onImageLoad = onImageLoad;
   _onError = onError;
+  _onBulkFiles = onBulkFiles;
 
   _dropzone = document.getElementById('dropzone');
   _previewArea = document.getElementById('preview-area');
@@ -40,10 +43,12 @@ export function initDropzone({ onImageLoad, onError }) {
   // 2. File picker
   btnBrowse.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
-    if (fileInput.files.length) {
+    if (fileInput.files.length > 1 && _onBulkFiles) {
+      _onBulkFiles(Array.from(fileInput.files));
+    } else if (fileInput.files.length) {
       handleFile(fileInput.files[0]);
-      fileInput.value = '';
     }
+    fileInput.value = '';
   });
 
   // 3. Clipboard paste (document-level)
@@ -126,10 +131,15 @@ const preventDefaults = (e) => {
   e.stopPropagation();
 };
 
-/** Extract the first file from a DataTransfer and hand it to handleFile. */
+/** Extract files from a DataTransfer. Single file → handleFile, multi → bulk callback. */
 const processDroppedFile = (dataTransfer) => {
-  const file = dataTransfer?.files[0];
-  if (file) handleFile(file);
+  const files = dataTransfer?.files;
+  if (!files || files.length === 0) return;
+  if (files.length > 1 && _onBulkFiles) {
+    _onBulkFiles(Array.from(files));
+    return;
+  }
+  handleFile(files[0]);
 };
 
 const setupDropTarget = (el) => {

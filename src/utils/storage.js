@@ -1,9 +1,27 @@
 const STORAGE_KEY = 'pixdrip-config';
 
+function isQuotaError(err) {
+  return (
+    err &&
+    (err.name === 'QuotaExceededError' ||
+      err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      err.code === 22 ||
+      err.code === 1014)
+  );
+}
+
 export function saveConfig(config) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-  } catch (e) { /* quota exceeded or private mode — silently fail */ }
+    return true;
+  } catch (err) {
+    if (isQuotaError(err) && typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('pixdrip:storage-quota-exceeded'));
+      } catch { /* ignore */ }
+    }
+    return false;
+  }
 }
 
 export function loadConfig() {

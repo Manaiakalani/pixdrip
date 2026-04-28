@@ -6,12 +6,37 @@
   <title>pixdrip — Blog Image Beautifier</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#0b0a0e" />
+  <meta name="theme-color" content="#0b0a0e" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#fafaf7" media="(prefers-color-scheme: light)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="pixdrip — A browser-based blog image beautifier. Resize, add borders, shadows, frames, and effects for any platform." />
+  <!-- Open Graph / Twitter — ships an og-image.png at /og-image.png -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="pixdrip — Blog Image Beautifier" />
+  <meta property="og:description" content="Drop any image, get a polished, platform-ready graphic with borders, shadows, device frames, and effects. Runs entirely in your browser." />
+  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="pixdrip — Blog Image Beautifier" />
+  <meta name="twitter:description" content="Drop any image, get a polished, platform-ready graphic with borders, shadows, device frames, and effects." />
+  <meta name="twitter:image" content="/og-image.png" />
   <link rel="apple-touch-icon" href="/favicon.svg" />
   <link rel="preload" href="/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- Theme bootstrap — runs synchronously before paint to avoid FOUC.
+       If you tighten CSP to disallow inline scripts, hash this block. -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('pixdrip:theme');
+        var theme = stored === 'light' || stored === 'dark'
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) { /* no storage — leave default dark */ }
+    })();
+  </script>
   <style>
     /* Self-hosted fonts — latin subset only. Instrument Sans is a variable font
        (covers weights 400–700 in a single file). IBM Plex Mono ships separate
@@ -44,6 +69,15 @@
   <link rel="stylesheet" href="/src/styles/main.css" />
 </head>
 <body>
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0b0a0e;color:#ececf1;font-family:system-ui,-apple-system,sans-serif;padding:24px;text-align:center;">
+      <div style="max-width:480px;padding:32px;border:1px solid rgba(255,248,240,0.1);border-radius:16px;background:rgba(20,18,26,0.72);">
+        <h1 style="font-size:22px;font-weight:600;margin:0 0 12px;background:linear-gradient(135deg,#ff6b4a,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent;">pixdrip needs JavaScript</h1>
+        <p style="font-size:14px;line-height:1.55;color:rgba(236,236,241,0.72);margin:0 0 16px;">This is a client-side image editor — there's no server to fall back to. Please enable JavaScript or visit on a modern browser to use pixdrip.</p>
+        <p style="font-size:13px;margin:0;"><a style="color:#ff8a65;text-decoration:none;border-bottom:1px solid rgba(255,138,101,0.4);" href="https://github.com/Manaiakalani/pixdrip">View source on GitHub →</a></p>
+      </div>
+    </div>
+  </noscript>
   <div id="app">
     <!-- Header -->
     <header class="app-header">
@@ -60,6 +94,9 @@
         <h1 class="logo-text">pixdrip</h1>
       </div>
       <div class="header-actions">
+        <button id="theme-toggle" class="btn-ghost" type="button" title="Toggle theme" aria-label="Toggle light/dark theme">
+          <span class="theme-toggle-icon" aria-hidden="true">🌙</span>
+        </button>
         <button id="btn-new" class="btn-ghost" title="New image (Cmd+N)" aria-label="New image">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         </button>
@@ -127,6 +164,12 @@
               <button class="toggle-btn" data-bg-type="transparent">None</button>
             </div>
             <div id="gradient-presets" class="gradient-grid"></div>
+            <div id="auto-palette" class="auto-palette" hidden>
+              <button type="button" id="btn-auto-palette" class="auto-palette-btn" aria-label="Apply gradient suggested from image">
+                <span class="auto-palette-swatch" id="auto-palette-swatch" aria-hidden="true"></span>
+                <span class="auto-palette-label">✨ From image</span>
+              </button>
+            </div>
             <div class="custom-gradient-row">
               <input type="color" id="ctrl-gradient-stop1" class="input-color" value="#ff6b4a" aria-label="Gradient start color" />
               <span class="gradient-arrow">→</span>
@@ -375,6 +418,7 @@
                   <option value="image/png">PNG</option>
                   <option value="image/jpeg">JPEG</option>
                   <option value="image/webp">WebP</option>
+                  <option value="image/avif">AVIF</option>
                 </select>
               </div>
               <div class="slider-row" id="quality-row">
@@ -408,10 +452,15 @@
         <!-- Dropzone (shown when no image) -->
         <div id="dropzone" class="dropzone">
           <div class="dropzone-content">
-            <div class="dropzone-icon">
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                <rect x="6" y="6" width="36" height="36" rx="8" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.4"/>
-                <path d="M24 16v16M16 24h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+            <div class="dropzone-icon" aria-hidden="true">
+              <svg class="dropzone-droplet" width="56" height="56" viewBox="0 0 32 32" fill="none">
+                <defs>
+                  <linearGradient id="dropzone-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ff6b4a"/>
+                    <stop offset="100%" stop-color="#fbbf24"/>
+                  </linearGradient>
+                </defs>
+                <path d="M16 2c0 0-6 8-6 14a6 6 0 0 0 12 0c0-6-6-14-6-14z" fill="url(#dropzone-grad)"/>
               </svg>
             </div>
             <p class="dropzone-title">Drop an image here</p>
@@ -423,7 +472,12 @@
                 <button id="btn-url" class="btn-url-go" aria-label="Load image from URL" disabled>Go</button>
               </div>
             </div>
-            <input type="file" id="file-input" accept="image/*" hidden aria-label="Upload image file" />
+            <input type="file" id="file-input" accept="image/*" multiple hidden aria-label="Upload image file" />
+          </div>
+          <div id="first-run-hint" class="first-run-hint" hidden role="note" aria-live="polite">
+            <span class="first-run-hint-icon" aria-hidden="true">👋</span>
+            <span class="first-run-hint-text">Drop, paste, or pick an image to begin</span>
+            <button id="first-run-hint-dismiss" type="button" class="first-run-hint-close" aria-label="Dismiss hint">×</button>
           </div>
         </div>
 
@@ -445,12 +499,5 @@
   <div id="toast-container" class="toast-container" aria-live="polite" role="status"></div>
 
   <script type="module" src="/src/main.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
-      });
-    }
-  </script>
 </body>
 </html>

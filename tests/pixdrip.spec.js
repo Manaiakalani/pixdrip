@@ -947,3 +947,285 @@ test.describe('V3 Features', () => {
     await expect(canvas).toHaveAttribute('aria-label', 'Preview of exported image');
   });
 });
+// ---------------------------------------------------------------------------
+// V4 Features
+// ---------------------------------------------------------------------------
+
+// Helper — load a PNG (base64) into the file input; returns when the preview is up.
+async function loadTestImage(page, { width = 200, height = 100, color = '#3498db', name = 'test-image.png' } = {}) {
+  const dataUrl = await page.evaluate(({ w, h, c }) => {
+    const cvs = document.createElement('canvas');
+    cvs.width = w; cvs.height = h;
+    const ctx = cvs.getContext('2d');
+    ctx.fillStyle = c;
+    ctx.fillRect(0, 0, w, h);
+    return cvs.toDataURL('image/png');
+  }, { w: width, h: height, c: color });
+
+  await page.evaluate(({ dataUrl, name }) => {
+    const arr = dataUrl.split(',');
+    const bstr = atob(arr[1]);
+    const u8 = new Uint8Array(bstr.length);
+    for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
+    const blob = new Blob([u8], { type: 'image/png' });
+    const file = new File([blob], name, { type: 'image/png' });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('file-input');
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { dataUrl, name });
+
+  await expect(page.locator('#preview-area')).toBeVisible();
+}
+
+test.describe('V4 Features', () => {
+
+  // ---- A) OG / Twitter / noscript -----------------------------------------
+  test('OG and Twitter card meta tags present', async ({ page }) => {
+    await page.goto('/');
+    const ogTitle = await page.locator('meta[property="og:title"]').getAttribute('content');
+    expect(ogTitle).toContain('pixdrip');
+    const ogImage = await page.locator('meta[property="og:image"]').getAttribute('content');
+    expect(ogImage).toBe('/og-image.png');
+    const twCard = await page.locator('meta[name="twitter:card"]').getAttribute('content');
+    expect(twCard).toBe('summary_large_image');
+    const twImage = await page.locator('meta[name="twitter:image"]').getAttribute('content');
+    expect(twImage).toBe('/og-image.png');
+  });
+
+  test('noscript fallback exists in body', async ({ page }) => {
+    await page.goto('/');
+    // Read raw HTML so we can inspect the <noscript> contents (which the
+    // browser hides because JS is on).
+    const html = await page.content();
+    expect(html).toMatch(/<noscript>[\s\S]*pixdrip needs JavaScript[\s\S]*<\/noscript>/i);
+  });
+
+  // ---- B) WebP/AVIF export + quality slider -------------------------------
+  test('export format includes AVIF option', async ({ page }) => {
+    await page.goto('/');
+    const opts = await page.locator('#ctrl-format option').allTextContents();
+    expect(opts).toContain('AVIF');
+    expect(opts).toContain('WebP');
+  });
+
+  test('quality slider visible only for non-PNG formats', async ({ page }) => {
+    await page.goto('/');
+    const format = page.locator('#ctrl-format');
+    const qualityRow = page.locator('#quality-row');
+
+    await expect(qualityRow).toBeHidden();
+    await format.selectOption('image/webp');
+    await expect(qualityRow).toBeVisible();
+    await format.selectOption('image/avif');
+    await expect(qualityRow).toBeVisible();
+    await format.selectOption('image/png');
+    await expect(qualityRow).toBeHidden();
+  });
+
+  test('WebP export downloads a .webp file', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox toBlob webp behavior varies in CI; covered on chromium');
+    await page.goto('/');
+    await loadTestImage(page);
+    await page.locator('#ctrl-format').selectOption('image/webp');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator('#btn-export').click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/\.webp$/);
+  });
+
+  // ---- C) Bulk drop --------------------------------------------------------
+  test('file input has multiple attribute', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#file-input')).toHaveAttribute('multiple', '');
+  });
+
+  test('bulk drop of multiple files shows overlay and exports them', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'Firefox blocks programmatic multi-file downloads in headless mode');
+    await page.goto('/');
+
+    // Set up a download collector before kicking off the bulk export
+    const downloads = [];
+    page.on('download', (d) => downloads.push(d));
+
+    // Inject 3 PNG files via the file input (simulating multi-pick)
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      const colors = ['#ff0000', '#00ff00', '#0000ff'];
+      colors.forEach((color, i) => {
+        const c = document.createElement('canvas');
+        c.width = 80; c.height = 80;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, 80, 80);
+        const dataUrl = c.toDataURL('image/png');
+        const bstr = atob(dataUrl.split(',')[1]);
+        const u8 = new Uint8Array(bstr.length);
+        for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+        const blob = new Blob([u8], { type: 'image/png' });
+        dt.items.add(new File([blob], `bulk-${i}.png`, { type: 'image/png' }));
+      });
+      const input = document.getElementById('file-input');
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Overlay should appear at some point during the run
+    await expect(page.locator('#bulk-overlay')).toBeVisible({ timeout: 5000 });
+
+    // Wait for a success toast — the overlay is removed and a toast shows
+    await expect(page.locator('.toast--success').filter({ hasText: /Exported 3 image/ })).toBeVisible({ timeout: 15000 });
+    expect(downloads.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('bulk drop with a non-image file produces a skip toast', async ({ page, browserName }) => {
+    test.skip(browserName === 'firefox', 'Multi-file path is chromium-tested only');
+    await page.goto('/');
+
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      // One valid image
+      const c = document.createElement('canvas');
+      c.width = 60; c.height = 60;
+      c.getContext('2d').fillRect(0, 0, 60, 60);
+      const dataUrl = c.toDataURL('image/png');
+      const bstr = atob(dataUrl.split(',')[1]);
+      const u8 = new Uint8Array(bstr.length);
+      for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+      dt.items.add(new File([new Blob([u8], { type: 'image/png' })], 'good.png', { type: 'image/png' }));
+      // One invalid (text) file
+      dt.items.add(new File([new Blob(['hello'], { type: 'text/plain' })], 'bad.txt', { type: 'text/plain' }));
+
+      const input = document.getElementById('file-input');
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await expect(page.locator('.toast--error').filter({ hasText: /Skipped 1/ })).toBeVisible({ timeout: 10000 });
+  });
+
+  // ---- D) Auto-color extraction -------------------------------------------
+  test('auto-palette suggestion appears after image load', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#auto-palette')).toBeHidden();
+    await loadTestImage(page, { color: '#cc4422', width: 120, height: 120 });
+    // Suggestion is computed in idle, give it a moment
+    await expect(page.locator('#auto-palette')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('#btn-auto-palette')).toBeVisible();
+  });
+
+  test('clicking auto-palette applies gradient mode', async ({ page }) => {
+    await page.goto('/');
+    await loadTestImage(page, { color: '#22aa55', width: 120, height: 120 });
+    await expect(page.locator('#auto-palette')).toBeVisible({ timeout: 5000 });
+    // Switch to solid first to verify the click flips back to gradient
+    await page.locator('.toggle-btn[data-bg-type="solid"]').click();
+    await expect(page.locator('.toggle-btn[data-bg-type="solid"]')).toHaveClass(/active/);
+    await page.locator('#btn-auto-palette').click();
+    await expect(page.locator('.toggle-btn[data-bg-type="gradient"]')).toHaveClass(/active/);
+  });
+
+  // ---- E) localStorage quota ----------------------------------------------
+  test('storage quota error fires toast', async ({ page }) => {
+    await page.goto('/');
+    // Stub localStorage.setItem so the next save throws QuotaExceededError
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) {
+        if (k === 'pixdrip-config') {
+          const err = new Error('quota');
+          err.name = 'QuotaExceededError';
+          throw err;
+        }
+        return original.call(this, k, v);
+      };
+    });
+    // Trigger a save — change padding via slider input
+    await page.locator('#ctrl-padding').evaluate((el) => {
+      el.value = '99';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // Save is debounced 300ms; allow time
+    await expect(page.locator('.toast--error').filter({ hasText: /storage full/i })).toBeVisible({ timeout: 5000 });
+  });
+
+  // ---- H) First-run hint --------------------------------------------------
+  test('first-run hint visible on fresh storage and dismissible', async ({ page }) => {
+    // Fresh context — clear localStorage before navigating
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await expect(page.locator('#first-run-hint')).toBeVisible();
+    await page.locator('#first-run-hint-dismiss').click();
+    await expect(page.locator('#first-run-hint')).toBeHidden();
+    await page.reload();
+    await expect(page.locator('#first-run-hint')).toBeHidden();
+  });
+
+  test('first-run hint hides when an image loads', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await expect(page.locator('#first-run-hint')).toBeVisible();
+    await loadTestImage(page);
+    await expect(page.locator('#first-run-hint')).toBeHidden();
+  });
+
+  // ---- I) Empty-state polish ----------------------------------------------
+  test('dropzone shows animated coral droplet logo', async ({ page }) => {
+    await page.goto('/');
+    const droplet = page.locator('.dropzone-droplet');
+    await expect(droplet).toBeVisible();
+    // path fill should reference the coral→amber gradient
+    const fill = await droplet.locator('path').getAttribute('fill');
+    expect(fill).toMatch(/url\(#dropzone-grad\)/);
+  });
+
+  // ---- J) Light theme toggle ----------------------------------------------
+  test('theme toggle switches data-theme and persists', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    const initial = await page.evaluate(() => document.documentElement.dataset.theme);
+    expect(['light', 'dark']).toContain(initial);
+
+    // Force into dark to start, then toggle.
+    await page.evaluate(() => {
+      localStorage.setItem('pixdrip:theme', 'dark');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    });
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+
+    const darkBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+    await page.locator('#theme-toggle').click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
+    const lightBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(lightBg).not.toBe(darkBg);
+
+    // Persist across reload
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
+
+    // Toggle back
+    await page.locator('#theme-toggle').click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  });
+
+  // ---- K) CSP / inline-script audit ---------------------------------------
+  test('only the documented theme-bootstrap inline script is present', async ({ page }) => {
+    await page.goto('/');
+    // Count inline (non-src) scripts. The theme bootstrap is the single
+    // expected exception. If this count grows, the CSP team needs to know.
+    const inlineScripts = await page.evaluate(() => {
+      const scripts = Array.from(document.querySelectorAll('script'));
+      return scripts.filter((s) => !s.src && s.textContent.trim().length > 0).length;
+    });
+    expect(inlineScripts).toBe(1);
+  });
+});

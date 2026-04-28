@@ -91,6 +91,9 @@ export function initControls({ onChange, onExport, onCopy, onBatchExport, onNew 
     btnNew:         document.getElementById('btn-new'),
     gradientStop1:  document.getElementById('ctrl-gradient-stop1'),
     gradientStop2:  document.getElementById('ctrl-gradient-stop2'),
+    autoPalette:    document.getElementById('auto-palette'),
+    autoPaletteBtn: document.getElementById('btn-auto-palette'),
+    autoPaletteSwatch: document.getElementById('auto-palette-swatch'),
     tiltToggle:     document.getElementById('ctrl-tilt-toggle'),
     tiltControls:   document.getElementById('tilt-controls'),
     tiltX:          document.getElementById('ctrl-tilt-x'),
@@ -702,7 +705,36 @@ export function initControls({ onChange, onExport, onCopy, onBatchExport, onNew 
     dom.btnExport.disabled = !loaded;
     if (dom.btnCopy) dom.btnCopy.disabled = !loaded;
     if (dom.btnBatch) dom.btnBatch.disabled = !loaded;
+    if (!loaded) setAutoPaletteSuggestion(null);
   }
 
-  return { getConfig, setConfig, setImageLoaded };
+  // Auto-color suggestion: stash stops and reveal the "From image" swatch.
+  // `stops` is null to clear, or an array like ['#ff6b4a', '#fbbf24'].
+  let _autoStops = null;
+  function setAutoPaletteSuggestion(stops) {
+    if (!dom.autoPalette || !dom.autoPaletteBtn || !dom.autoPaletteSwatch) return;
+    if (!stops || stops.length < 2) {
+      _autoStops = null;
+      dom.autoPalette.hidden = true;
+      return;
+    }
+    _autoStops = [stops[0], stops[1]];
+    dom.autoPaletteSwatch.style.background =
+      `linear-gradient(135deg, ${stops[0]}, ${stops[1]})`;
+    dom.autoPalette.hidden = false;
+  }
+
+  if (dom.autoPaletteBtn) {
+    dom.autoPaletteBtn.addEventListener('click', () => {
+      if (!_autoStops) return;
+      // Force gradient mode and apply the suggested stops
+      config.background.type = 'gradient';
+      if (!config.background.gradient) config.background.gradient = { stops: [], angle: 135 };
+      config.background.gradient.stops = [..._autoStops];
+      syncInputs();
+      emit();
+    });
+  }
+
+  return { getConfig, setConfig, setImageLoaded, setAutoPaletteSuggestion };
 }

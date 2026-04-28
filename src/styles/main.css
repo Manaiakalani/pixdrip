@@ -1949,3 +1949,199 @@ button,
     transition-duration: 0.01ms !important;
   }
 }
+/* ----------------------------------------------------------
+   40. V4 — Light theme tokens
+   ---------------------------------------------------------- */
+:root[data-theme="light"] {
+  --bg-app: #fafaf7;
+  --bg-app-deep: #f3f1ec;
+  --bg-elevated: #ffffff;
+  --bg-sidebar: rgba(255, 252, 248, 0.78);
+  --bg-surface: rgba(20, 18, 26, 0.04);
+  --bg-surface-hover: rgba(20, 18, 26, 0.07);
+  --bg-surface-active: rgba(20, 18, 26, 0.10);
+
+  --ambient-coral: rgba(255, 138, 101, 0.12);
+  --ambient-amber: rgba(251, 191, 36, 0.10);
+  --ambient-violet: rgba(124, 92, 220, 0.06);
+
+  --text-primary: #1c1a1f;
+  --text-secondary: rgba(28, 26, 31, 0.6);
+  --text-tertiary: rgba(28, 26, 31, 0.4);
+
+  --border-subtle: rgba(20, 18, 26, 0.06);
+  --border-medium: rgba(20, 18, 26, 0.10);
+  --border-highlight: rgba(20, 18, 26, 0.08);
+
+  --shadow-sm: 0 1px 2px rgba(20, 18, 26, 0.08);
+  --shadow-md: 0 6px 18px rgba(20, 18, 26, 0.10);
+
+  --accent-text: #d65a3a;
+  color-scheme: light;
+}
+
+/* Soften vignette for light theme — pure black at 28% would muddy the bg */
+:root[data-theme="light"] .canvas-area::after {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 45%,
+    rgba(20, 18, 26, 0.06) 100%
+  );
+}
+
+/* ----------------------------------------------------------
+   41. V4 — Theme toggle button
+   ---------------------------------------------------------- */
+#theme-toggle .theme-toggle-icon {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+#theme-toggle:hover .theme-toggle-icon {
+  transform: rotate(-12deg) scale(1.08);
+}
+
+/* ----------------------------------------------------------
+   42. V4 — Dropzone droplet (replaces the dashed-rect icon)
+   ---------------------------------------------------------- */
+.dropzone-droplet {
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 6px 14px rgba(255, 107, 74, 0.25));
+  animation: dropletBounce 2.6s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+@keyframes dropletBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  45%      { transform: translateY(-6px) scale(1.02); }
+  55%      { transform: translateY(-6px) scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropzone-droplet { animation: none; }
+}
+
+/* ----------------------------------------------------------
+   43. V4 — First-run hint
+   ---------------------------------------------------------- */
+.first-run-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-medium);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-primary);
+  font-size: 13px;
+  z-index: 4;
+  animation: hintFadeIn 320ms var(--ease-out);
+}
+.first-run-hint[hidden] { display: none; }
+.first-run-hint-icon { font-size: 14px; }
+.first-run-hint-close {
+  background: transparent;
+  border: 0;
+  color: var(--text-tertiary);
+  font-size: 18px;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+.first-run-hint-close:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+@keyframes hintFadeIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ----------------------------------------------------------
+   44. V4 — Auto-palette suggestion
+   ---------------------------------------------------------- */
+.auto-palette { margin: 8px 0 4px; }
+.auto-palette[hidden] { display: none; }
+.auto-palette-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+.auto-palette-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-medium);
+}
+.auto-palette-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-medium);
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------
+   45. V4 — Bulk export overlay
+   ---------------------------------------------------------- */
+.bulk-overlay {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 10px 16px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 9999;
+  animation: hintFadeIn 200ms var(--ease-out);
+}
+.bulk-overlay[hidden] { display: none; }
+
+/* ----------------------------------------------------------
+   46. V4 — Toast action button
+   ---------------------------------------------------------- */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toast-message { flex: 1; }
+.toast-action {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.toast-action:hover { background: rgba(255, 255, 255, 0.18); }
+:root[data-theme="light"] .toast-action {
+  background: rgba(20, 18, 26, 0.06);
+  border-color: rgba(20, 18, 26, 0.12);
+}
+:root[data-theme="light"] .toast-action:hover {
+  background: rgba(20, 18, 26, 0.12);
+}
