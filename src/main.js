@@ -25,6 +25,13 @@ try {
 let currentImage = null;
 let imageMeta = null;
 let renderRAF = 0;
+let renderPending = false;
+
+// requestIdleCallback shim — falls back to setTimeout where unsupported (Safari).
+const ric =
+  typeof requestIdleCallback === 'function'
+    ? requestIdleCallback
+    : (cb) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 0 }), 1);
 
 // File size estimation
 let sizeEstimateTimer = null;
@@ -237,17 +244,27 @@ function setupMobileSidebar() {
 function init() {
   const canvas = document.getElementById('preview-canvas');
   const preview = initPreview(canvas);
-  initSocialPreview();
+  // Social preview isn't visible until the user opens that section, so defer
+  // its DOM setup to idle time to keep first paint snappy.
+  ric(() => initSocialPreview());
 
   const controls = initControls({
     onChange(config) {
       debouncedSave(config);
       pushHistory(config);
-      cancelAnimationFrame(renderRAF);
-      renderRAF = requestAnimationFrame(() => {
-        if (currentImage) preview.updatePreview(currentImage, config);
-        updateSocialPreview(currentImage, config);
-      });
+      // Coalesce repeated change events (e.g., slider drags) into a single
+      // render per animation frame. We track a `renderPending` flag rather
+      // than always cancelling/re-scheduling, so the rAF runs against the
+      // freshest config instead of being thrashed.
+      if (!renderPending) {
+        renderPending = true;
+        renderRAF = requestAnimationFrame(() => {
+          renderPending = false;
+          const latest = controls.getConfig();
+          if (currentImage) preview.updatePreview(currentImage, latest);
+          updateSocialPreview(currentImage, latest);
+        });
+      }
       updateFileSizeEstimate(config);
     },
 
