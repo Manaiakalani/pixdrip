@@ -10,13 +10,20 @@ export function initPreview(canvas) {
   let currentConfig = null;
   let onOffsetChange = null;
 
-  // Drag state
+  // Drag state (pointer events — works for mouse, pen, and touch)
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
   let startOffsetX = 0;
   let startOffsetY = 0;
   let displayScale = 1;
+  let activePointerId = null;
+
+  // Multi-touch (pinch) state
+  const activePointers = new Map(); // pointerId -> { x, y }
+  let pinchStartDistance = 0;
+  let pinchStartZoom = 1;
+  let isPinching = false;
 
   // Cached DOM refs
   const canvasArea = document.querySelector('.canvas-area');
@@ -68,47 +75,115 @@ export function initPreview(canvas) {
     cachedAreaHeight = 0;
   });
 
-  // Drag to reposition image within frame
-  canvas.addEventListener('mousedown', (e) => {
+  // Drag to reposition + pinch to zoom (Pointer Events: mouse + touch + pen)
+  const clampZoom = (z) => Math.max(0.5, Math.min(3, z));
+
+  function pinchDistance() {
+    const pts = [...activePointers.values()];
+    if (pts.length < 2) return 0;
+    const dx = pts[0].x - pts[1].x;
+    const dy = pts[0].y - pts[1].y;
+    return Math.hypot(dx, dy);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
     if (!currentImage || !currentConfig) return;
-    isDragging = true;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    startOffsetX = currentConfig.imageOffset?.x ?? 0;
-    startOffsetY = currentConfig.imageOffset?.y ?? 0;
-    canvas.style.cursor = 'grabbing';
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 1) {
+      isDragging = true;
+      isPinching = false;
+      activePointerId = e.pointerId;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      startOffsetX = currentConfig.imageOffset?.x ?? 0;
+      startOffsetY = currentConfig.imageOffset?.y ?? 0;
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      if (e.pointerType === 'mouse') canvas.style.cursor = 'grabbing';
+    } else if (activePointers.size === 2) {
+      isDragging = false;
+      isPinching = true;
+      pinchStartDistance = pinchDistance();
+      pinchStartZoom = currentConfig.imageOffset?.zoom ?? 1;
+    }
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', (e) => {
-    if (!isDragging || !currentConfig) return;
-    const scale = displayScale || 1;
-    const dx = (e.clientX - dragStartX) / scale;
-    const dy = (e.clientY - dragStartY) / scale;
-    const newOffset = {
-      x: startOffsetX + dx,
-      y: startOffsetY + dy,
-      zoom: currentConfig.imageOffset?.zoom ?? 1,
-    };
-    currentConfig = { ...currentConfig, imageOffset: newOffset };
-    scheduleRender();
-    if (onOffsetChange) onOffsetChange(newOffset);
-  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!currentConfig) return;
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  document.addEventListener('mouseup', () => {
-    if (isDragging) {
-      isDragging = false;
-      canvas.style.cursor = 'grab';
+    if (isPinching && activePointers.size >= 2) {
+      const dist = pinchDistance();
+      if (pinchStartDistance > 0) {
+        const ratio = dist / pinchStartDistance;
+        const newZoom = clampZoom(pinchStartZoom * ratio);
+        const newOffset = {
+          x: currentConfig.imageOffset?.x ?? 0,
+          y: currentConfig.imageOffset?.y ?? 0,
+          zoom: newZoom,
+        };
+        currentConfig = { ...currentConfig, imageOffset: newOffset };
+        scheduleRender();
+        if (onOffsetChange) onOffsetChange(newOffset);
+      }
+      e.preventDefault();
+      return;
+    }
+
+    if (isDragging && e.pointerId === activePointerId) {
+      const scale = displayScale || 1;
+      const dx = (e.clientX - dragStartX) / scale;
+      const dy = (e.clientY - dragStartY) / scale;
+      const newOffset = {
+        x: startOffsetX + dx,
+        y: startOffsetY + dy,
+        zoom: currentConfig.imageOffset?.zoom ?? 1,
+      };
+      currentConfig = { ...currentConfig, imageOffset: newOffset };
+      scheduleRender();
+      if (onOffsetChange) onOffsetChange(newOffset);
+      e.preventDefault();
     }
   });
 
-  // Scroll to zoom
+  function endPointer(e) {
+    activePointers.delete(e.pointerId);
+    try { canvas.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
+    if (e.pointerId === activePointerId) {
+      isDragging = false;
+      activePointerId = null;
+      canvas.style.cursor = 'grab';
+    }
+    if (activePointers.size < 2) {
+      isPinching = false;
+    }
+    if (activePointers.size === 1 && currentConfig) {
+      // Resume drag with the remaining pointer
+      const [[id, pt]] = activePointers.entries();
+      activePointerId = id;
+      isDragging = true;
+      dragStartX = pt.x;
+      dragStartY = pt.y;
+      startOffsetX = currentConfig.imageOffset?.x ?? 0;
+      startOffsetY = currentConfig.imageOffset?.y ?? 0;
+    }
+  }
+
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', (e) => {
+    if (e.buttons === 0) endPointer(e);
+  });
+
+  // Scroll to zoom (mouse wheel + trackpad pinch — dispatches wheel)
   canvas.addEventListener('wheel', (e) => {
     if (!currentImage || !currentConfig) return;
     e.preventDefault();
     const currentZoom = currentConfig.imageOffset?.zoom ?? 1;
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    const newZoom = Math.max(0.5, Math.min(3, currentZoom + delta));
+    const newZoom = clampZoom(currentZoom + delta);
     const newOffset = {
       x: currentConfig.imageOffset?.x ?? 0,
       y: currentConfig.imageOffset?.y ?? 0,
@@ -118,6 +193,9 @@ export function initPreview(canvas) {
     scheduleRender();
     if (onOffsetChange) onOffsetChange(newOffset);
   }, { passive: false });
+
+  // Suppress browser pan/zoom while interacting with the canvas
+  canvas.style.touchAction = 'none';
 
   // Set default cursor on canvas
   canvas.style.cursor = 'grab';
@@ -186,21 +264,31 @@ export function initPreview(canvas) {
   }
 
   let isDraggingSlider = false;
-  comparisonSlider.addEventListener('mousedown', (e) => {
+  let sliderPointerId = null;
+  comparisonSlider.addEventListener('pointerdown', (e) => {
     isDraggingSlider = true;
+    sliderPointerId = e.pointerId;
+    try { comparisonSlider.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', (e) => {
-    if (!isDraggingSlider) return;
+  comparisonSlider.addEventListener('pointermove', (e) => {
+    if (!isDraggingSlider || e.pointerId !== sliderPointerId) return;
     const rect = comparisonOverlay.getBoundingClientRect();
     comparisonPosition = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100));
     updateSliderPosition();
   });
 
-  document.addEventListener('mouseup', () => {
-    isDraggingSlider = false;
-  });
+  const endSlider = (e) => {
+    if (e.pointerId === sliderPointerId) {
+      isDraggingSlider = false;
+      sliderPointerId = null;
+      try { comparisonSlider.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
+    }
+  };
+  comparisonSlider.addEventListener('pointerup', endSlider);
+  comparisonSlider.addEventListener('pointercancel', endSlider);
+  comparisonSlider.style.touchAction = 'none';
 
   return { updatePreview, setOnOffsetChange };
 }

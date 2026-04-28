@@ -35,7 +35,16 @@
 
   /* Spacing */
   --sidebar-width: 320px;
+  --sidebar-width-wide: 340px;
+  --sidebar-width-max: 380px;
   --header-height: 52px;
+  --tap-target: 44px;
+
+  /* Safe-area insets (iPhone notches, Android gesture bars) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -113,6 +122,19 @@ button {
 :focus-visible {
   outline: 2px solid var(--accent-start);
   outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Restore focus rings explicitly for form controls (we cleared default outline above) */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+[role='radio']:focus-visible {
+  outline: 2px solid var(--accent-start);
+  outline-offset: 2px;
 }
 
 #app {
@@ -137,16 +159,17 @@ button {
   top: 0;
   left: 0;
   right: 0;
-  height: var(--header-height);
+  height: calc(var(--header-height) + var(--safe-top));
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: var(--safe-top) max(16px, var(--safe-right)) 0 max(16px, var(--safe-left));
   background: var(--bg-sidebar);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-subtle);
+  contain: layout paint;
 }
 
 /* ----------------------------------------------------------
@@ -313,7 +336,7 @@ button {
 .sidebar {
   position: fixed;
   left: 0;
-  top: var(--header-height);
+  top: calc(var(--header-height) + var(--safe-top));
   bottom: 0;
   width: var(--sidebar-width);
   background: var(--bg-sidebar);
@@ -321,6 +344,8 @@ button {
   -webkit-backdrop-filter: blur(20px);
   border-right: 1px solid var(--border-subtle);
   z-index: 50;
+  padding-left: var(--safe-left);
+  contain: layout paint;
 }
 
 .sidebar-inner {
@@ -328,9 +353,12 @@ button {
   flex-direction: column;
   gap: 4px;
   padding: 16px;
+  padding-bottom: max(16px, var(--safe-bottom));
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* Custom scrollbar */
@@ -846,11 +874,12 @@ button {
 .canvas-area {
   flex: 1;
   margin-left: var(--sidebar-width);
-  margin-top: var(--header-height);
+  margin-top: calc(var(--header-height) + var(--safe-top));
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100vh - var(--header-height) - var(--safe-top));
+  min-height: calc(100dvh - var(--header-height) - var(--safe-top));
   overflow: hidden;
   position: relative;
   background-color: var(--bg-app);
@@ -991,8 +1020,10 @@ button {
 .preview-area canvas {
   max-width: 90%;
   max-height: calc(100vh - var(--header-height) - 40px);
+  max-height: calc(100dvh - var(--header-height) - var(--safe-top) - 40px);
   object-fit: contain;
   border-radius: 4px;
+  touch-action: none;
 }
 
 .preview-info {
@@ -1027,13 +1058,16 @@ button {
    ---------------------------------------------------------- */
 .toast-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: max(24px, calc(var(--safe-bottom) + 12px));
+  right: max(24px, calc(var(--safe-right) + 12px));
+  left: auto;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 8px;
   pointer-events: none;
+  max-width: calc(100vw - 32px);
+  contain: layout;
 }
 
 .toast {
@@ -1339,9 +1373,73 @@ button {
 .social-card--linkedin { border-color: rgba(0, 119, 181, 0.2); }
 
 /* ----------------------------------------------------------
-   31. Responsive — Mobile
+   31. Responsive — Mobile & Tablet
    ---------------------------------------------------------- */
+
+/* Tablet & below — sidebar becomes a bottom-sheet drawer overlaying canvas */
 @media (max-width: 768px) {
+  /* Prevent iOS focus-zoom on form inputs (must be ≥16px) */
+  .input-number,
+  .input-text,
+  .input-url,
+  .input-select,
+  input[type='text'],
+  input[type='number'],
+  input[type='url'],
+  input[type='email'],
+  input[type='search'],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Tap targets ≥44px — inputs */
+  .input-number,
+  .input-select,
+  .input-text {
+    height: 44px;
+  }
+  .input-url,
+  .btn-url-go {
+    height: 44px;
+  }
+
+  /* Tap targets ≥44px — buttons */
+  .btn-primary,
+  .btn-secondary,
+  .btn-batch {
+    height: 44px;
+    padding: 0 18px;
+  }
+  .btn-ghost {
+    width: 44px;
+    height: 44px;
+  }
+  .btn-lock {
+    width: 44px;
+    height: 44px;
+  }
+  .toggle-btn {
+    height: 36px;
+  }
+  .preset-btn,
+  .frame-btn {
+    min-height: 56px;
+  }
+  .gradient-swatch {
+    min-height: 44px;
+  }
+  .btn-comparison,
+  .btn-social-preview {
+    min-height: 36px;
+    padding: 8px 12px;
+  }
+  .btn-reset-crop {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Sidebar — bottom-sheet drawer that overlays canvas (does not push it) */
   .sidebar {
     position: fixed;
     top: auto;
@@ -1349,14 +1447,18 @@ button {
     left: 0;
     right: 0;
     width: 100%;
-    max-height: 60vh;
+    max-height: 70vh;
+    max-height: 70dvh;
     height: auto;
     border-right: none;
     border-top: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    transform: translateY(calc(100% - 48px));
+    /* Collapsed: only handle is visible (~52px including safe area) */
+    transform: translateY(calc(100% - 52px - var(--safe-bottom)));
     transition: transform 300ms var(--ease-out);
     z-index: 60;
+    padding-left: 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
   }
 
   .sidebar.sidebar--expanded {
@@ -1364,27 +1466,171 @@ button {
   }
 
   .sidebar-inner {
-    padding-top: 8px;
+    padding-top: 4px;
+    padding-bottom: max(16px, var(--safe-bottom));
+    padding-left: max(16px, var(--safe-left));
+    padding-right: max(16px, var(--safe-right));
   }
 
+  /* Canvas occupies full width below header; sidebar overlays it */
   .canvas-area {
     margin-left: 0;
-    margin-bottom: 48px;
-    min-height: calc(100vh - var(--header-height) - 48px);
+    margin-bottom: calc(52px + var(--safe-bottom));
+    min-height: calc(100vh - var(--header-height) - var(--safe-top) - 52px - var(--safe-bottom));
+    min-height: calc(100dvh - var(--header-height) - var(--safe-top) - 52px - var(--safe-bottom));
   }
 
+  .preview-area canvas {
+    max-width: 95%;
+    max-height: calc(100dvh - var(--header-height) - var(--safe-top) - 52px - var(--safe-bottom) - 24px);
+  }
+
+  /* Sidebar handle — large, easy tap target (≥44px) */
   .sidebar-handle {
     display: flex;
     justify-content: center;
-    padding: 8px 0 4px;
+    align-items: center;
+    width: 100%;
+    height: 44px;
+    padding: 12px 0;
     cursor: pointer;
+    background: transparent;
+    border: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .sidebar-handle-bar {
-    width: 32px;
+    width: 40px;
     height: 4px;
     background: var(--border-medium);
     border-radius: 2px;
+    transition: background var(--duration-fast) var(--ease-out);
   }
+  .sidebar.sidebar--expanded .sidebar-handle-bar {
+    background: var(--accent-text);
+  }
+
+  /* Toast container — sits above the collapsed sidebar */
+  .toast-container {
+    bottom: calc(52px + var(--safe-bottom) + 12px);
+    right: 12px;
+    left: 12px;
+    align-items: flex-end;
+  }
+  .toast {
+    max-width: 100%;
+  }
+
+  /* Reposition floating preview-area buttons */
+  .btn-comparison {
+    top: 8px;
+    right: 8px;
+  }
+  .btn-social-preview {
+    top: 8px;
+    right: 88px;
+  }
+  .social-preview-panel {
+    width: calc(100vw - 24px);
+    right: 12px;
+    top: 56px;
+    max-height: 60vh;
+    max-height: 60dvh;
+  }
+
+  .dropzone-content {
+    padding: 32px 20px;
+  }
+  .header-actions {
+    gap: 4px;
+  }
+}
+
+/* Phone — tighten further */
+@media (max-width: 480px) {
+  .preset-grid,
+  .frame-style-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .gradient-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .dropzone-content {
+    padding: 24px 16px;
+  }
+  .dropzone-title {
+    font-size: 16px;
+  }
+  .dropzone-subtitle {
+    font-size: 12px;
+  }
+  .logo-text {
+    font-size: 14px;
+  }
+}
+
+/* ----------------------------------------------------------
+   31a. Responsive — Wide Desktop
+   ---------------------------------------------------------- */
+@media (min-width: 1440px) {
+  :root {
+    --sidebar-width: var(--sidebar-width-wide);
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --sidebar-width: var(--sidebar-width-max);
+  }
+  .preview-area canvas {
+    max-width: 80%;
+  }
+}
+
+/* ----------------------------------------------------------
+   31b. Touch / hover capability tweaks
+   ---------------------------------------------------------- */
+
+/* Suppress sticky hover effects on touch devices */
+@media (hover: none) {
+  .gradient-swatch:hover {
+    transform: none;
+  }
+  .preset-btn:hover,
+  .frame-btn:hover,
+  .btn-secondary:hover,
+  .btn-ghost:hover,
+  .btn-batch:hover {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+  }
+  .btn-primary:hover {
+    filter: none;
+  }
+  .toggle-btn:hover {
+    color: var(--text-secondary);
+  }
+  /* Hover-only delete affordance is irrelevant on touch */
+  .custom-preset-btn:hover::after {
+    content: none;
+  }
+}
+
+/* Tap-highlight reset on interactive controls */
+button,
+[role='button'],
+.toggle-track,
+.preset-btn,
+.frame-btn,
+.gradient-swatch,
+.sidebar-handle,
+.toggle-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* CSS containment on isolated layout regions */
+.control-section {
+  contain: layout paint;
 }
 
 /* ----------------------------------------------------------

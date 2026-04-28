@@ -31,6 +31,9 @@ export function initDropzone({ onImageLoad, onError }) {
   const inputUrl = document.getElementById('input-url');
   const btnUrl = document.getElementById('btn-url');
 
+  // 0. Touch-aware copy + reliable tap-to-pick on coarse pointer devices
+  applyTouchAwareCopy(btnBrowse);
+
   // 1. Drag & drop on #dropzone
   setupDropTarget(_dropzone);
 
@@ -71,7 +74,52 @@ export function resetDropzone() {
   if (btnUrl) btnUrl.disabled = true;
 }
 
-// ── drag & drop ─────────────────────────────────────────────────────────────
+// ── touch-aware UX ──────────────────────────────────────────────────────────
+
+/** True if the primary input is touch-like (no hover, coarse pointer). */
+const isCoarsePointer = () => {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+};
+
+const applyTouchAwareCopy = (btnBrowse) => {
+  const titleEl = _dropzone?.querySelector('.dropzone-title');
+  const subtitleEl = _dropzone?.querySelector('.dropzone-subtitle');
+
+  const apply = () => {
+    const coarse = isCoarsePointer();
+    if (titleEl) {
+      titleEl.textContent = coarse ? 'Tap to choose an image' : 'Drop an image here';
+    }
+    if (subtitleEl) {
+      subtitleEl.textContent = coarse
+        ? 'or paste from clipboard · enter URL'
+        : 'or paste from clipboard · browse files · enter URL';
+    }
+    if (btnBrowse) {
+      btnBrowse.textContent = coarse ? 'Choose image' : 'Browse files';
+    }
+  };
+
+  apply();
+
+  // React to capability changes (rare, but: external mouse plugged in, etc.)
+  try {
+    const mql = window.matchMedia('(hover: none) and (pointer: coarse)');
+    mql.addEventListener?.('change', apply);
+  } catch { /* ignore */ }
+
+  // On coarse-pointer devices, make the entire dropzone surface tappable to
+  // open the file picker. On precise devices we keep the explicit Browse
+  // button (taps elsewhere shouldn't steal focus from URL input etc.).
+  _dropzone?.addEventListener('click', (e) => {
+    if (!isCoarsePointer()) return;
+    // Ignore taps on inputs / explicit buttons — they have their own handlers
+    if (e.target.closest('input, button, a, label, [role="button"]')) return;
+    document.getElementById('file-input')?.click();
+  });
+};
+
 
 const preventDefaults = (e) => {
   e.preventDefault();
